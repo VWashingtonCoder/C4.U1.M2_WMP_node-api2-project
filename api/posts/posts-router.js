@@ -17,17 +17,14 @@ router.get('/', (req, res) => {
 })
 // GET Specified Post
 router.get('/:id', (req, res) => {
-    let id = Number(req.params.id);
-    if(Number.isNaN(id)){
-        res.status(404).json({ message: 'The post with the specified ID deos not exist' })
-        return
-    } 
-    Post.findById(req.params.id)
+    let id = req.params.id;
+    
+    Post.findById(id)
         .then(post => {
             if(post) {
                 res.status(200).json(post);
             } else {
-                res.status(404).json({ message: 'The post with the specified ID deos not exist' })
+                res.status(404).json({ message: 'The post with the specified ID does not exist' })
             }
         })
         .catch(err => {
@@ -37,11 +34,14 @@ router.get('/:id', (req, res) => {
 })
 // Create New Post
 router.post('/', (req, res) => {
-    let postBody = req.body
-    if(!postBody.title || !postBody.contents){
+    const { title, contents } = req.body
+    if(!title || !contents){
         res.status(400).json({ message: 'Please provide title and contents for the post' })
     } else {
-        Post.insert(req.body)
+        Post.insert({ title, contents })
+            .then(({ id }) => {
+                return Post.findById(id)
+            })
             .then(post => {
                 res.status(201).json(post)
             })
@@ -60,18 +60,56 @@ router.put('/:id', (req, res) => {
         res.status(400).json({ message: 'Please provide title and contents for the post' })       
     } else {
         Post.update(id, changes)
-            .then(post => {
-                if(post){
-                    res.status(200).json(post)
-                } else {
+            .then(updated => {
+                if(!updated){
                     res.status(404).json({ message: 'The post with the specified ID does not exist' })
+                    
+                } else {
+                   return Post.findById(id) 
                 }
+            })
+            .then(post =>{
+                console.log(post)
+                res.status(200).json(post)
             })
             .catch(err => {
                 console.log(err)
                 res.status(500).json({ message: 'The post information could not be modified' })
             })
     }
+})
+// Delete Specified Post
+router.delete('/:id', async (req, res) => {
+    try{
+        let id = req.params.id
+        const post = await Post.findById(id)
+        console.log(post)
+        
+        if(!post){
+            res.status(404).json({ message: 'The post with the specified ID does not exist' })
+        } else {
+            await Post.remove(id)
+            res.status(200).json(post)
+        }
+    } catch (err) {
+        console.log(err)
+        res.status(500).json({ message: 'The post could not be removed' })
+    }
+})
+// GET All Comments On Specified Post
+router.get('/:id/comments', (req, res) => {
+    Post.findPostComments(req.params.id)
+        .then(comments => {
+            if(comments.length > 0){
+                res.status(200).json(comments)
+            } else {
+                res.status(404).json({ message: 'The post with the specified ID does not exist' })
+            }
+        })
+        .catch(err => {
+            console.log(err)
+            res.status(500).json({ message: 'The comments information could not be retrieved' })
+        })
 })
 
 module.exports = router;
